@@ -93,11 +93,11 @@ make -C .. plan
 make -C .. apply
 ```
 
-Después del apply:
+Después del apply (en esta cuenta ya está hecho):
 
 1. Confirmar la suscripción SNS que llega al correo de alarmas.
-2. En SES, verificar el sender (link en el correo de AWS). Mientras SES esté en **sandbox**, solo se envía a direcciones verificadas. Pedir production access: SES → Account dashboard → Request production access.
-3. Pegar `webhook_url` en Wompi → Desarrolladores → Eventos: `transaction.updated`.
+2. SES: dominio `techtest.app` verificado, production access **concedido**, From `pagos@techtest.app`. En una cuenta nueva hay que verificar el dominio y pedir salir de sandbox.
+3. Pegar `webhook_url` en Wompi → Desarrolladores → Eventos: `transaction.updated` (URL de API Gateway, no un túnel).
 4. Checkout: `cloudfront_url` (output).
 
 ## Seguridad (sin inflar costo)
@@ -109,7 +109,7 @@ Después del apply:
 - Secretos en SSM SecureString, no en env vars.
 - TLS 1.2+ en CloudFront y origen API.
 - Security headers gestionados de CloudFront.
-- Throttle en API Gateway + reserved concurrency en Lambdas (techo de costo).
+- Throttle en API Gateway (50 rps). Sin reserved concurrency (cuota 10 de cuenta nueva; ADR 12).
 - Logs de API **sin body** (el email viaja en el POST).
 - Retención de logs 14 días.
 - DynamoDB cifrado con clave AWS (gratis) + PITR.
