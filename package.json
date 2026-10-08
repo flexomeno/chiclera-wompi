@@ -1,0 +1,21 @@
+{
+  "name": "wompi-qr-test",
+  "version": "1.0.0",
+  "description": "Script de pruebas para generar transacciones con Código QR (BANCOLOMBIA_QR) usando el API de Wompi en Sandbox",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test:qr": "node src/test-qr.js",
+    "generate-secret": "node scripts/generate-secret.js",
+    "server": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "nodemailer": "^10.0.16",
+    "pngjs": "^7.0.0",
+    "twilio": "^6.1.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
+  }
+}

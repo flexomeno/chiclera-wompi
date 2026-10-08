@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pagar con Código QR</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; text-align: center; margin-top: 40px; color: #222; }
+    .box { display: inline-block; padding: 24px 32px; border-radius: 12px; background: #f9f9f9; min-width: 320px; max-width: 92vw; }
+    input { padding: 10px; font-size: 16px; width: 260px; border: 1px solid #ccc; border-radius: 8px; }
+    button { padding: 10px 20px; font-size: 16px; border-radius: 8px; border: none;
+             background: #1a1a2e; color: white; cursor: pointer; margin-top: 10px; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .code { font-size: 44px; font-weight: bold; letter-spacing: 8px; background: #e9f9ee;
+             display: inline-block; padding: 16px 24px; border-radius: 12px; margin-top: 16px; }
+    .status { color: #555; margin-top: 14px; }
+    img.qr { width: 220px; height: 220px; margin-top: 14px; }
+    .muted { color: #888; font-size: 13px; }
+    .btn-secondary { background: white; color: #1a1a2e; border: 2px solid #1a1a2e; }
+    .tip { text-align: left; background: #fff8e1; border: 1px solid #ffe082; border-radius: 10px;
+           padding: 12px 16px; margin-top: 16px; font-size: 13px; color: #5a4a00; max-width: 280px; }
+    .tip b { display: block; margin-bottom: 4px; }
+    .tip ol { margin: 6px 0 0 18px; padding: 0; }
+    .tip li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Pagar con Código QR</h1>
+  <div class="box" id="box">
+    <div id="form-step">
+      <p>Monto a pagar: <strong id="amount">—</strong></p>
+      <input id="email" type="email" placeholder="tu-correo@ejemplo.com" autocomplete="email" />
+      <br />
+      <button id="btn-crear">Generar código QR</button>
+    </div>
+    <div id="qr-step" style="display:none;">
+      <p class="status" id="status-text">Generando QR…</p>
+      <div id="qr-container"></div>
+      <div id="code-container"></div>
+    </div>
+  </div>
+  <p class="muted">El código de validación llega a tu correo al completar el pago.</p>
+
+  <script>
+    const amountInCents = ${amount_in_cents};
+    document.getElementById('amount').textContent =
+      '$' + (amountInCents / 100).toLocaleString('es-CO') + ' COP';
+
+    const btnCrear = document.getElementById('btn-crear');
+    const emailInput = document.getElementById('email');
+
+    btnCrear.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      if (!email || !email.includes('@')) {
+        alert('Ingresa un correo válido.');
+        return;
+      }
+
+      btnCrear.disabled = true;
+      btnCrear.textContent = 'Creando...';
+
+      const res = await fetch('/api/qr/crear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert('Error: ' + (err.error || 'No se pudo crear la transacción.'));
+        btnCrear.disabled = false;
+        btnCrear.textContent = 'Generar código QR';
+        return;
+      }
+
+      const data = await res.json();
+      document.getElementById('form-step').style.display = 'none';
+      document.getElementById('qr-step').style.display = 'block';
+      showQr(data);
+      pollStatus(data.transactionId);
+    });
+
+    function showQr(data) {
+      const qrContainer = document.getElementById('qr-container');
+      const statusText = document.getElementById('status-text');
+      statusText.textContent = 'Escanea el QR para pagar';
+
+      const svgDataUrl = data.qrImage ? ('data:image/svg+xml;base64,' + data.qrImage) : '';
+      let download = '';
+      if (data.qrPng) {
+        const filename = 'codigo-qr-' + data.transactionId + '-' + Date.now() + '.png';
+        download =
+          '<a href="data:image/png;base64,' + data.qrPng + '" download="' + filename + '">' +
+            '<button class="btn-secondary" type="button">Descargar imagen del QR</button></a>';
+      }
+
+      qrContainer.innerHTML =
+        (svgDataUrl ? '<img class="qr" src="' + svgDataUrl + '" alt="Código QR de pago" />' : '') +
+        '<p class="muted">Escanea este QR con tu app bancaria (Bancolombia / Nequi)</p>' +
+        '<div>' + download + '</div>' +
+        '<div class="tip">' +
+          '<b>Pagando desde este mismo celular?</b>' +
+          'No podrás escanearlo con la cámara (es la misma pantalla). En su lugar:' +
+          '<ol>' +
+            '<li>Pulsa "Descargar imagen del QR" (o toma una captura).</li>' +
+            '<li>Abre Nequi → Escanear código.</li>' +
+            '<li>Usa "Escanear desde imagen" en la parte inferior.</li>' +
+            '<li>Selecciona la imagen descargada.</li>' +
+          '</ol>' +
+        '</div>';
+    }
+
+    async function pollStatus(transactionId) {
+      const statusText = document.getElementById('status-text');
+      const codeContainer = document.getElementById('code-container');
+
+      try {
+        const res = await fetch('/api/qr/estado/' + transactionId);
+        const data = await res.json();
+
+        if (data.code) {
+          statusText.textContent = 'Pago aprobado';
+          codeContainer.innerHTML =
+            '<p>Tu código de validación es:</p><p class="code">' + data.code + '</p>' +
+            '<p class="muted">También te lo enviamos por correo. Preséntalo en el dispositivo.</p>';
+          return;
+        }
+
+        if (data.status === 'DECLINED' || data.status === 'ERROR') {
+          statusText.textContent = 'Pago ' + (data.status === 'DECLINED' ? 'declinado' : 'con error');
+          return;
+        }
+
+        statusText.textContent = 'Esperando que completes el pago…';
+        setTimeout(() => pollStatus(transactionId), 2500);
+      } catch (err) {
+        statusText.textContent = 'Error consultando el estado. Reintentando…';
+        setTimeout(() => pollStatus(transactionId), 3000);
+      }
+    }
+  </script>
+</body>
+</html>

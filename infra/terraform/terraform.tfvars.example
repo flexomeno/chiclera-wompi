@@ -1,0 +1,17 @@
+aws_region     = "us-east-1"
+environment    = "prod"
+project_name   = "wompi-qr"
+
+ses_sender_email           = "tu-correo@dominio.com"
+ses_from_address           = "pagos@techtest.app"
+budget_notification_email  = "tu-correo@dominio.com"
+amount_in_cents            = 200000
+monthly_budget_usd         = 10
+
+wompi_base_url         = "https://production.wompi.co/v1"
+wompi_sandbox_status   = ""
+wompi_public_key       = "pub_prod_..."
+wompi_private_key      = "prv_prod_..."
+wompi_integrity_secret = "prod_integrity_..."
+wompi_events_secret    = "prod_events_..."
+hotp_secret            = "hex-del-secreto-compartido-con-la-pi"

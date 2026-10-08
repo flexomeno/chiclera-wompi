@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recibo</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; text-align: center; margin-top: 60px; color: #222; }
+    .code { font-size: 48px; font-weight: bold; letter-spacing: 10px; background: #f3f3f3;
+             display: inline-block; padding: 16px 24px; border-radius: 12px; }
+    .muted { color: #888; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Pago pendiente</h1>
+  <div id="body">
+    <p>Aún no encontramos un código para esta transacción.</p>
+    <p class="muted">Si acabas de pagar, espera unos segundos — esta página se actualiza sola.</p>
+  </div>
+  <script>
+    const id = new URLSearchParams(location.search).get('id');
+    async function load() {
+      if (!id) return;
+      try {
+        const res = await fetch('/api/qr/estado/' + encodeURIComponent(id));
+        const data = await res.json();
+        if (data.code) {
+          document.getElementById('title').textContent = 'Pago aprobado';
+          const amount = (data.amountInCents / 100).toLocaleString('es-CO');
+          document.getElementById('body').innerHTML =
+            '<p>Monto: <strong>$' + amount + ' COP</strong></p>' +
+            '<p>Referencia: ' + data.reference + '</p>' +
+            '<p>Tu código de validación es:</p>' +
+            '<p class="code">' + data.code + '</p>' +
+            '<p class="muted">También lo enviamos a tu correo. Es de un solo uso.</p>';
+          return;
+        }
+        if (data.status === 'DECLINED' || data.status === 'ERROR') {
+          document.getElementById('title').textContent = 'Pago no completado';
+          document.getElementById('body').innerHTML = '<p>Estado: ' + data.status + '</p>';
+          return;
+        }
+      } catch (e) { /* retry */ }
+      setTimeout(load, 2500);
+    }
+    load();
+  </script>
+</body>
+</html>
