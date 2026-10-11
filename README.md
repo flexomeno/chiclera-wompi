@@ -25,7 +25,8 @@ se validó el flujo. **Ya no es el runtime.**
    el método es QR, se genera un HOTP de 6 dígitos, se guarda en DynamoDB y se
    envía por SES.
 4. La pantalla de recibo hace poll a `/api/qr/estado/{id}` (solo DynamoDB).
-5. En caja, `pi/validar_codigo.py` acepta o rechaza el código offline.
+5. En caja, el **ESP32** (`dispositivo/`) acepta o rechaza el código offline
+   (teclado + LCD I2C + servo). `pi/validar_codigo.py` queda como referencia.
 
 El Widget de Wompi (`/pagar`) **no** se usa en prod: no se puede restringir a QR
 y un pago con otro método cobraria la tarifa alta **sin** generar código.
@@ -40,7 +41,7 @@ y un pago con otro método cobraria la tarifa alta **sin** generar código.
 | `infra/terraform/terraform.tfvars` | Las mismas llaves para el apply |
 | `*.tfstate`, `.terraform/` | State con parámetros SSM |
 | `infra/.build/` | Zip de Lambda |
-| `data/`, `provisioning/`, `pi/secret.key`, `pi/state.json` | Códigos y secreto de la Pi |
+| `data/`, `provisioning/`, `pi/secret.key`, `pi/state.json`, `dispositivo/validador/secrets.h` | Códigos y secreto HOTP |
 | `tfplan` | Puede serializar secretos |
 
 Sí van al repo: `*.tf`, `*.tfvars.example`, `.env.example`, `.terraform.lock.hcl`,
@@ -56,13 +57,15 @@ Sí van al repo: `*.tf`, `*.tfvars.example`, `.env.example`, `.terraform.lock.hc
 │   ├── lambdas/
 │   └── frontend/
 ├── src/                           # Prototipo local (Express + Gmail SMTP)
-├── pi/                            # Validador HOTP offline (Python, sin deps)
+├── dispositivo/                   # Validador físico ESP32 (teclado, LCD I2C, servo)
+├── pi/                            # Mismo HOTP en Python (referencia / Pi)
 ├── scripts/                       # Secreto HOTP y depuración Playwright
 └── .env.example                   # Plantilla; copiar a .env, no commitear
 ```
 
-`src/hotp.js` y `pi/hotp.py` **deben** generar el mismo código para el mismo
-secreto y contador (HMAC-SHA256, 6 dígitos, primer counter = 0).
+`src/hotp.js`, `pi/hotp.py` y `dispositivo/validador/hotp.cpp` **deben** generar
+el mismo código para el mismo secreto y contador (HMAC-SHA256, 6 dígitos,
+primer counter = 0).
 
 ## Producción (AWS)
 

@@ -7,6 +7,7 @@ data/
 provisioning/
 pi/secret.key
 pi/state.json
+dispositivo/validador/secrets.h
 
 # Terraform — nunca el state, los tfvars reales ni el zip de Lambda
 **/.terraform/
