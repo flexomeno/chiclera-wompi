@@ -9,14 +9,15 @@
  * Sin WiFi. Secreto en secrets.h (mismo hex que HOTP_SECRET / pi/secret.key).
  *
  * Placa Arduino IDE: "ESP32 Dev Module"
- * Librerías: LiquidCrystal I2C (Frank de Brabander), ESP32Servo
+ * Librerías: hd44780, ESP32Servo
  */
 
 #include <ESP32Servo.h>
-#include <LiquidCrystal_I2C.h>
 #include <Preferences.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <hd44780.h>
+#include <hd44780ioClass/hd44780_I2Cexp.h>
 
 #include "hotp.h"
 
@@ -60,7 +61,8 @@ static const int SERVO_ABIERTO = 15;
 static const uint32_t ABIERTO_MS = 15000;
 static const uint32_t RECHAZO_MS = 2000;
 
-LiquidCrystal_I2C *lcd = nullptr;
+hd44780_I2Cexp lcd;
+bool lcdOk = false;
 Servo servo;
 Preferences prefs;
 
@@ -89,37 +91,37 @@ static void ledInvalid() {
 }
 
 static void lcdPrint(uint8_t col, uint8_t row, const char *text) {
-  if (!lcd) return;
-  lcd->setCursor(col, row);
-  lcd->print(text);
+  if (!lcdOk) return;
+  lcd.setCursor(col, row);
+  lcd.print(text);
 }
 
 static void showTitulo() {
-  if (!lcd) return;
-  lcd->setCursor(0, 0);
-  lcd->print("Ingresa tu      ");
+  if (!lcdOk) return;
+  lcd.setCursor(0, 0);
+  lcd.print("Ingresa tu      ");
 }
 
 static void showCodigo() {
-  if (!lcd) return;
-  lcd->setCursor(0, 1);
-  lcd->print("codigo ");
+  if (!lcdOk) return;
+  lcd.setCursor(0, 1);
+  lcd.print("codigo ");
   for (uint8_t i = 0; i < DIGITS; i++) {
-    lcd->print(i < typedLen ? typed[i] : '_');
+    lcd.print(i < typedLen ? typed[i] : '_');
   }
-  lcd->print("   ");
+  lcd.print("   ");
 }
 
 static void prompt() {
   ledsOff();
-  if (!lcd) return;
+  if (!lcdOk) return;
   showTitulo();
   showCodigo();
 }
 
 static void showMsg(const char *l1, const char *l2) {
-  if (!lcd) return;
-  lcd->clear();
+  if (!lcdOk) return;
+  lcd.clear();
   lcdPrint(0, 0, l1);
   lcdPrint(0, 1, l2);
 }
@@ -193,9 +195,11 @@ static void onValid(int32_t counter) {
   lastCounter = counter;
   prefs.putInt("last", lastCounter);
 
-  lcd->clear();
-  lcdPrint(0, 0, "Gira la perilla");
-  lcdPrint(0, 1, "a la derecha");
+  if (lcdOk) {
+    lcd.clear();
+    lcdPrint(0, 0, "Gira la perilla");
+    lcdPrint(0, 1, "a la derecha");
+  }
   beepTimes(1);
   ledValid();
   servo.write(SERVO_ABIERTO);
@@ -209,10 +213,17 @@ static void onValid(int32_t counter) {
 }
 
 static void onInvalid() {
-  prompt();
+  Serial.printf("Rechazado: '%s' last=%ld\n", typed, (long)lastCounter);
+  if (lcdOk) {
+    lcd.clear();
+    lcdPrint(0, 0, "No valido");
+    lcd.setCursor(0, 1);
+    lcd.print("leido ");
+    lcd.print(typed);
+  }
   beepTimes(2);
   ledInvalid();
-  delay(RECHAZO_MS);
+  delay(2500);
   ledsOff();
   typedLen = 0;
   typed[0] = '\0';
@@ -272,17 +283,26 @@ void setup() {
   servo.write(SERVO_REPOSO);
 
   Wire.begin(PIN_SDA, PIN_SCL);
+  delay(50);
   const uint8_t addr = probeI2c();
-  lcd = new LiquidCrystal_I2C(addr ? addr : 0x27, 16, 2);
-  lcd->init();
-  lcd->backlight();
-
-  if (!addr) {
-    Serial.println("No hay dispositivo I2C. Revisa SDA=21 SCL=22 y VCC/GND.");
+  const int status = lcd.begin(16, 2);
+  lcdOk = (status == 0);
+  if (!lcdOk) {
+    Serial.printf("LCD begin=%d addr=0x%02X. SDA=21 SCL=22 VCC/GND.\n", status,
+                  addr);
+    ledInvalid();
   } else {
-    Serial.printf("LCD I2C en 0x%02X\n", addr);
+    lcd.backlight();
+    lcd.clear();
+    Serial.printf("LCD I2C OK 0x%02X\n", addr);
+    // Dos parpadeos: el firmware corre aunque el contraste esté mal.
+    for (int i = 0; i < 2; i++) {
+      lcd.noBacklight();
+      delay(150);
+      lcd.backlight();
+      delay(150);
+    }
   }
-  lcd->clear();
   prompt();
   delay(200);
 
@@ -298,15 +318,10 @@ void setup() {
 
   prefs.begin("hotp", false);
   lastCounter = prefs.getInt("last", -1);
+  Serial.printf("secretLen=%u last=%ld\n", (unsigned)secretLen, (long)lastCounter);
 
   typed[0] = '\0';
   typedLen = 0;
-
-  if (HOTP_SECRET_IS_EXAMPLE) {
-    showMsg("Secreto EJEMPLO", "Pega el real");
-    delay(2000);
-  }
-
   prompt();
 }
 

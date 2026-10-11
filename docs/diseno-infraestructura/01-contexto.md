@@ -2,7 +2,7 @@
 
 ## 1.1 Título
 
-**Checkout QR serverless (Wompi + HOTP + SES)** — diseño de la infraestructura de TI en AWS para cobrar con Código QR Bancolombia/Nequi, registrar cada venta y su correo, emitir un código de un solo uso y validarlo sin internet en un dispositivo local (Raspberry Pi).
+**Checkout QR serverless (Wompi + HOTP + SES)** — diseño de la infraestructura de TI en AWS para cobrar con Código QR Bancolombia/Nequi, registrar cada venta y su correo, emitir un código de un solo uso y validarlo sin internet en un dispositivo local (ESP32).
 
 ## 1.2 Autores y revisores
 
@@ -17,14 +17,14 @@
 | Estado | Significado |
 |---|---|
 | **Borrador** | Diseño previo al primer apply. |
-| **Desplegado en AWS (prod)** (actual) | Stack Terraform aplicado en `us-east-1`. Checkout, webhook, SES (dominio `techtest.app`, From `pagos@techtest.app`) y correo en inbox verificados con pago real. |
+| **Desplegado en AWS (prod) + caja ESP32** (actual) | Stack Terraform en `us-east-1` y validador físico flasheado. Checkout, webhook, SES y canje HOTP en la caja verificados con pago real. |
 | En revisión | Esperando comentarios de revisores. |
 | Aprobado | Se puede hacer `terraform apply` de prod con este diseño. |
 | Superado | Reemplazado por una versión posterior o por un ADR que cambie el núcleo. |
 
 ## 1.4 Problema de negocio
 
-Se venden unidades de bajo ticket en Colombia. El cliente paga desde el celular (Nequi / Bancolombia). Tras el pago aprobado debe recibir un **código HOTP de un solo uso** y presentarlo en un dispositivo **sin internet** (Raspberry Pi). El comercio necesita:
+Se venden unidades de bajo ticket en Colombia. El cliente paga desde el celular (Nequi / Bancolombia). Tras el pago aprobado debe recibir un **código HOTP de un solo uso** y presentarlo en un dispositivo **sin internet** (ESP32). El comercio necesita:
 
 - Cobrar con la tarifa especial de Wompi **Código QR (1%)**, no con el plan de tarjetas.
 - Registrar **cada venta y el correo** del comprador.
@@ -44,7 +44,8 @@ El prototipo Express + Cloudflare Tunnel + Gmail SMTP sirvió para validar QR + 
 | Handlers serverless | `infra/lambdas/` |
 | UI de checkout | `infra/frontend/` |
 | Lógica HOTP / Wompi (compartida) | `src/` y copia empaquetada a Lambda |
-| Validador offline | `pi/hotp.py` |
+| Validador offline (caja) | `dispositivo/` (ESP32) |
+| Referencia HOTP Python | `pi/hotp.py` |
 
 ## 1.7 Glosario breve
 

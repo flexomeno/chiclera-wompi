@@ -8,8 +8,9 @@ Caja offline: el cliente teclea el código de 6 dígitos. Si es un HOTP válido
 3. Espera **15 segundos**. El LCD muestra `Gira la perilla` / `a la derecha`.
 4. El servo vuelve a **0°**, el LED se apaga y el LCD vuelve a `______`.
 
-Si el código es inválido o ya se usó: **dos pitidos**, LED rojo 2 s. El LCD no
-cambia el título: siempre `Ingresa tu` / `codigo ______` y los dígitos se ven al teclear.
+Mientras se teclea, el LCD es siempre `Ingresa tu` / `codigo ______` (los
+dígitos aparecen al pulsar). Si el código es inválido o ya se usó: **dos
+pitidos**, LED rojo y `No valido` / `leido ######` (lo que el teclado mandó).
 
 **No usa WiFi.** El secreto se copia a `secrets.h` por USB, igual que en la Pi.
 
@@ -34,7 +35,7 @@ No se usan: el NodeMCU Lolin ni la pila CR2032.
 ## Arduino IDE
 
 1. Placa: **ESP32 Dev Module** (paquete *esp32* de Espressif).
-2. Librerías: **LiquidCrystal I2C** (Frank de Brabander) y **ESP32Servo**.
+2. Librerías: **hd44780** y **ESP32Servo**.
 3. Abre `dispositivo/validador/validador.ino`.
 4. Secreto:
 
@@ -63,7 +64,10 @@ aparte si el USB se cae al mover el servo).
 
 
 Dirección típica `0x27` o `0x3F`. Al arrancar el firmware la busca sola.
-El potenciómetro del backpack regula el contraste.
+
+Si la luz de fondo parpadea pero no hay letras: gira el **potenciómetro azul**
+del backpack (destornillador fino) hasta que aparezcan los caracteres. Sin eso
+el LCD se ve vacío aunque el I2C funcione.
 
 ### Servo MG90S
 
@@ -121,21 +125,37 @@ Cinta de 8 hilos, pin 1 = el de la marca / el más cercano al borde negro:
 Si un número no coincide, gira el teclado o intercambia filas/columnas en
 `KEYS` / `PIN_ROWS` / `PIN_COLS` de `validador.ino`.
 
+## Flashear (arduino-cli)
+
+Placa: **ESP32 Dev Module**. Puerto típico en macOS: `/dev/cu.usbserial-0001`.
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 dispositivo/validador
+arduino-cli upload --fqbn esp32:esp32:esp32:UploadSpeed=115200 \
+  --port /dev/cu.usbserial-0001 dispositivo/validador
+```
+
+Si esptool dice `Manufacturer: ff`, desconecta todo excepto el USB (no uses
+CLK/D0/D1/D2/D3/CMD) y reintenta a 115200. La luz del LCD parpadea dos veces
+al boot: si parpadea y no hay letras, **contraste**.
+
 ## Uso
 
 1. Enciende. LCD: `Ingresa tu` / `codigo ______`
 2. Cada tecla se ve en la segunda línea. `#` envía; `*` borra. A los 6 dígitos envía solo.
-3. Válido → 1 pitido + LED + servo 15° → 15 s → cierra. Inválido → 2 pitidos.
-4. Un código ya aceptado no vuelve a abrir (contador en flash).
-
-
+3. Válido → 1 pitido + LED + servo 15° + `Gira la perilla` / `a la derecha` → 15 s → cierra.
+4. Inválido → 2 pitidos + `No valido` / `leido` y los dígitos que recibió.
+5. Un código ya aceptado no vuelve a abrir (contador en NVS).
 
 ## Si no abre con un código bueno
 
-- El hex de `secrets.h` debe ser **idéntico** al de producción (64 caracteres).
-- El contador de la caja se atrasó más de 50 pagos sin validar → ventana agotada.
-- Para resetear solo el contador (peligro: permite reusar códigos viejos de la
-ventana): borra NVS en Arduino IDE (*Erase all flash*) o cambia el namespace.
+- El hex de `secrets.h` debe ser **idéntico** al de SSM / `.env` (64 caracteres).
+- `leido` debe ser exactamente el código del correo. Si no, el teclado está cruzado.
+- El contador NVS de la caja **adelante** del de DynamoDB (probar HOTP de lab en
+  la caja de prod) rechaza el pago real: ese código ya “se gastó” en la ventana.
+- Más de 50 pagos sin canjear en esta caja → ventana agotada.
+- Resetear el contador (peligro: reusa códigos viejos de la ventana): *Erase all
+  flash* en Arduino o borrar el namespace NVS `hotp`.
 
 
 

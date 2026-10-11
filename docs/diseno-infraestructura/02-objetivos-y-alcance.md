@@ -6,7 +6,7 @@
 2. **Cobrar solo con Código QR** (`BANCOLOMBIA_QR`), de modo que nunca se active la comisión alta de otros métodos (2.65 % + $700 + IVA).
 3. **Registrar cada venta y el correo** del comprador de forma durable (no archivos JSON locales).
 4. **Entregar el código HOTP por Amazon SES** cuando Wompi confirme `APPROVED`.
-5. **Mantener la validación offline** en la Raspberry Pi con el mismo secreto y la misma función HOTP que el backend.
+5. **Mantener la validación offline** en la caja ESP32 con el mismo secreto y la misma función HOTP que el backend.
 6. **Baseline de seguridad** (cifrado en tránsito, IAM mínimo, secretos fuera del código, logs sin cuerpo de PII, trail de management) **sin costos fijos** de NAT, WAF, Secrets Manager o KMS customer-managed.
 7. **Soportar un techo de 500 ventas pagadas al día** (~15.000 al mes) con costo AWS del orden de **USD 3–8 / mes**.
 8. **Infraestructura reproducible** con Terraform; un `apply` debe levantar el entorno.
@@ -26,7 +26,7 @@ Queda **fuera de esta versión**. Incluirlos requiere un ADR nuevo y ampliación
 | Dominio propio + certificado ACM | Arranque con HTTPS de CloudFront (`*.cloudfront.net`). |
 | WAF, GuardDuty, AWS Config, CMK | Costo fijo desproporcionado vs. ~USD 4 de runtime. |
 | Recolectar teléfono | Wompi QR no lo envía; sin WhatsApp no se pide (menos PII). |
-| Migrar la Pi a la nube | Debe seguir **sin internet** en el punto de validación. |
+| Migrar la caja a la nube | Debe seguir **sin internet** en el punto de validación. |
 | Panel de administración / BI | Los GSI de DynamoDB permiten consultas; no hay producto de reporting aún. |
 | Alta disponibilidad 99.99 % multi-región | No es un objetivo de este diseño. |
 
@@ -40,12 +40,12 @@ Cliente ingresa correo
   → webhook Wompi firma-verificado
   → se guarda venta + correo + código
   → SES envía el código
-  → el cliente lo presenta en la Pi (offline)
+  → el cliente lo presenta en la caja ESP32 (offline)
 ```
 
 ## 2.4 Criterios de éxito
 
 - `terraform apply` en `us-east-1` deja un `cloudfront_url` y un `webhook_url` operativos. **Cumplido.**
 - Un pago QR en prod deja ítem en DynamoDB con email + código y un correo SES en inbox (no spam). **Cumplido.**
-- La Pi valida ese código con el mismo secreto HOTP (fuera de este apply; mismo algoritmo).
+- La caja ESP32 valida ese código con el mismo secreto HOTP. **Cumplido** (lab + pago real).
 - La factura AWS de un mes al techo de 500/día permanece **por debajo del budget de USD 10**.

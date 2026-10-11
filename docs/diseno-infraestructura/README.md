@@ -4,9 +4,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 0.2 |
-| Fecha | 2026-10-08 |
-| Estado | **Desplegado en AWS (prod)** |
+| Versión | 0.3 |
+| Fecha | 2026-10-10 |
+| Estado | **Desplegado en AWS (prod) + caja ESP32** |
 | Autor | Wilmar Rengifo |
 | Revisor | Por confirmar |
 | Código de infra | [`infra/`](../../infra/README.md) (Terraform) |

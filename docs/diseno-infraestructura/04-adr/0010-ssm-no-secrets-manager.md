@@ -5,7 +5,7 @@
 
 ## Contexto
 
-Secrets Manager cobra USD 0,40 por secreto al mes. Tres o cuatro secretos Wompi + HOTP ≈ USD 1,20 fijos, una fracción grande de una factura de USD 4. SSM Standard SecureString con clave administrada `aws/ssm` es gratis. Rotación automática nativa es la ventaja de Secrets Manager; aquí la rotación es manual (y el HOTP además vive en la Pi).
+Secrets Manager cobra USD 0,40 por secreto al mes. Tres o cuatro secretos Wompi + HOTP ≈ USD 1,20 fijos, una fracción grande de una factura de USD 4. SSM Standard SecureString con clave administrada `aws/ssm` es gratis. Rotación automática nativa es la ventaja de Secrets Manager; aquí la rotación es manual (y el HOTP además vive en cada caja ESP32).
 
 ## Decisión
 
@@ -14,4 +14,4 @@ Todos los secretos de aplicación van a SSM SecureString bajo `/wompi-qr/{env}/`
 ## Consecuencias
 
 - **Bien:** $0 de secretos; mismo cifrado en reposo que necesita este volumen.
-- **Mal:** no hay rotación automática ni réplica multi-región. El HOTP se rota a mano en dos sitios (SSM y Pi). Aceptable.
+- **Mal:** no hay rotación automática ni réplica multi-región. El HOTP se rota a mano en SSM y en cada `secrets.h`. Aceptable.

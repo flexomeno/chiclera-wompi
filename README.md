@@ -1,7 +1,7 @@
 # Checkout QR — Wompi + HOTP + SES
 
 Pago con **Código QR** (`BANCOLOMBIA_QR`, tarifa 1%), código HOTP de un solo uso y
-correo al comprador. La Raspberry Pi valida el código **sin internet**.
+correo al comprador. La caja **ESP32** valida el código **sin internet**.
 
 **Producción está en AWS** (`us-east-1`): CloudFront + HTTP API + Lambda +
 DynamoDB + Amazon SES. Sin VPC, sin NAT, sin WhatsApp.
@@ -11,7 +11,7 @@ DynamoDB + Amazon SES. Sin VPC, sin NAT, sin WhatsApp.
 | Checkout | `https://d1jb3inqui1moe.cloudfront.net` |
 | Webhook Wompi | `https://w33aycsrjc.execute-api.us-east-1.amazonaws.com/webhooks/wompi` |
 | From SES | `Pagos <pagos@techtest.app>` |
-| Diseño | [`docs/diseno-infraestructura/`](docs/diseno-infraestructura/README.md) (v0.2, desplegado) |
+| Diseño | [`docs/diseno-infraestructura/`](docs/diseno-infraestructura/README.md) (v0.3, AWS + caja ESP32) |
 | Terraform | [`infra/`](infra/README.md) |
 
 El servidor Express local (`npm run server` + túnel) fue el prototipo con el que
@@ -93,17 +93,17 @@ Decisiones relevantes: serverless sin VPC ([ADR 02](docs/diseno-infraestructura/
 SES en vez de Gmail ([ADR 03](docs/diseno-infraestructura/04-adr/0003-ses-en-lugar-de-smtp-gmail.md)),
 From en dominio propio ([ADR 11](docs/diseno-infraestructura/04-adr/0011-from-ses-en-dominio-propio.md)),
 sin reserved concurrency ([ADR 12](docs/diseno-infraestructura/04-adr/0012-sin-reserved-concurrency-lambda.md)),
-sin WhatsApp en esta versión ([ADR 06](docs/diseno-infraestructura/04-adr/0006-sin-whatsapp-en-esta-version.md)).
+sin WhatsApp en esta versión ([ADR 06](docs/diseno-infraestructura/04-adr/0006-sin-whatsapp-en-esta-version.md)),
+caja ESP32 ([ADR 13](docs/diseno-infraestructura/04-adr/0013-validador-esp32.md)).
 
-## Raspberry Pi (offline)
+## Caja ESP32 (offline)
 
-Ver [`pi/README.md`](pi/README.md). El secreto se copia una vez por USB; la Pi
-nunca consulta AWS ni Wompi. Tras validar, persiste el contador en `state.json`
-(gitignored) para que el código no se reutilice.
+Ver [`dispositivo/README.md`](dispositivo/README.md). WiFi apagado. El secreto
+va en `secrets.h` (gitignored). El contador vive en la NVS del chip. Tras
+validar: 1 pitido, LED, servo +15°, LCD `Gira la perilla` / `a la derecha`,
+15 s, servo a 0°.
 
-```bash
-cd pi && python3 validar_codigo.py
-```
+La carpeta `pi/` es la misma lógica HOTP en Python, por si se usa una Pi.
 
 ## Prototipo local (no es prod)
 
@@ -131,6 +131,8 @@ mínimo de Wompi es **$1.500 COP**.
   `1561959-1791432524-39984`, código `752635` aprobado y no reutilizable.
 - **Prod (2026-10-08), stack AWS:** mismo flujo con SES `pagos@techtest.app`
   llegando a inbox.
+- **Prod (2026-10-10), caja ESP32:** firmware flasheado; LCD I2C + teclado +
+  HOTP alineado con DynamoDB; canje de pago real en el dispositivo.
 
 ## Wompi
 

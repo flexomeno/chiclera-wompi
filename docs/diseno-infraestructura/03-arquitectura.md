@@ -8,7 +8,7 @@ Núcleo del diseño. La implementación está en [`infra/terraform`](../../infra
 flowchart TB
   subgraph usuarios [Usuarios]
     Cliente[Cliente con celular]
-    Caja[Raspberry Pi sin internet]
+    Caja[ESP32 sin internet]
   end
 
   subgraph aws [AWS us-east-1 — sin VPC]
@@ -59,7 +59,7 @@ No hay NAT, subnets, ALB ni RDS. Las Lambdas usan la conectividad de internet qu
 5. Wompi llama `POST /webhooks/wompi` **directo al API Gateway** (no pasa por CloudFront; Wompi no envía el header de origen).
 6. Lambda **webhook** verifica SHA256 del evento, ignora métodos que no sean QR, y si `APPROVED`: incrementa el contador HOTP, guarda `code` + email, envía SES.
 7. El frontend hace poll a `GET /api/qr/estado/{id}` (solo DynamoDB, ítem pequeño) hasta ver el código.
-8. El cliente presenta el código en la Pi. `pi/hotp.py` debe coincidir con `src/hotp.js`.
+8. El cliente teclea el código en la caja ESP32. `dispositivo/validador/hotp.cpp` debe coincidir con `src/hotp.js` (y con `pi/hotp.py`).
 
 ## 3.3 Componentes de TI
 
@@ -104,7 +104,7 @@ Tabla `{project}-{env}-sales`, `PAY_PER_REQUEST`.
 **Contador HOTP**
 
 - `pk = COUNTER` / `sk = HOTP` / `value` (entero)
-- Primer valor emitido = **0**, igual que el prototipo JSON (parte de -1 e incrementa). Crítico para no desfasar la Pi si se reutiliza el mismo secreto.
+- Primer valor emitido = **0**, igual que el prototipo JSON (parte de -1 e incrementa). Crítico para no desfasar la caja si se reutiliza el mismo secreto.
 
 No hay TTL en ventas: el requisito de negocio es conservar el registro.
 

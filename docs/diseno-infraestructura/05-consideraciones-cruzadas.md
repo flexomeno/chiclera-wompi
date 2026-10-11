@@ -29,7 +29,7 @@ No hay tarjeta ni CVV en este diseño: el cobro ocurre en Wompi / banco. PCI de 
 
 - Consola AWS: usuarios IAM/Identity Center con MFA (fuera de Terraform; procedimiento de cuenta).
 - No hay bastion ni SSH: no hay EC2.
-- La Pi tiene el secreto en archivo local gitignored (`pi/secret.key`).
+- La caja ESP32 tiene el secreto en `secrets.h` (gitignored); la Pi de referencia usa `pi/secret.key`.
 
 ### Lo que no se cumple aún (deuda consciente)
 
@@ -79,7 +79,7 @@ Lambda, DynamoDB, API Gateway, SES, S3, CloudFront. Un fallo de una AZ no deber�
 ### Qué no está cubierto
 
 - Caída **regional** de us-east-1: no hay réplica en São Paulo. RTO ≈ “esperar a AWS” o `apply` manual en otra región (no ensayado). RPO de datos: PITR de DynamoDB (hasta 35 días, granularidad por segundo) **en la misma región**.
-- Wompi caído: no hay cobro; la Pi sigue validando códigos previos.
+- Wompi caído: no hay cobro; la caja ESP32 sigue validando códigos previos.
 - SES en bounce masivo: el código **ya está en DynamoDB y en pantalla**; el correo es canal extra.
 
 ### Procedimientos
@@ -88,14 +88,14 @@ Lambda, DynamoDB, API Gateway, SES, S3, CloudFront. Un fallo de una AZ no deber�
 |---|---|
 | Borrado accidental de ventas | Restaurar tabla con PITR. |
 | Frontend roto | Versionado S3; re-subir objeto o rollback de Terraform. |
-| Secreto HOTP filtrado | Rotar en SSM **y** en la Pi el mismo día; invalidar códigos no canjeados es decisión de negocio. |
+| Secreto HOTP filtrado | Rotar en SSM **y** reflash de `secrets.h` en cada caja el mismo día; invalidar códigos no canjeados es decisión de negocio. |
 | Webhook no llega | El poll solo mira DynamoDB: no hay código hasta que Wompi entregue el evento. Reproceso: reenviar evento desde el dashboard Wompi (idempotente por `code`). |
 | Cuenta AWS comprometida | CloudTrail management; rotar llaves; budget ya alerta gasto anómalo. |
 | Pérdida del state Terraform | Está en S3 versionado (`wompi-qr-tfstate-<account>/prod/`). Restaurar versión anterior del objeto. |
 
 ### Continuidad en caja
 
-La Raspberry Pi es el DR del **canje**: no depende de AWS en el momento de validar. Backup del `secret.key` y `state.json` de la Pi es responsabilidad operativa **fuera** de este stack (copia cifrada offline).
+El ESP32 es el DR del **canje**: no depende de AWS al validar. Backup del hex HOTP y del `last_counter` (NVS) es responsabilidad operativa **fuera** de este stack (copia cifrada offline). No borrar la flash a menos que se acepte reusar códigos viejos de la ventana.
 
 ## 5.5 Operación diaria
 
@@ -110,9 +110,10 @@ La Raspberry Pi es el DR del **canje**: no depende de AWS en el momento de valid
 | Riesgo | Mitigación actual | Residual |
 |---|---|---|
 | Webhook Wompi aún en URL vieja (túnel) | Actualizar dashboard a execute-api | Alto si no se cambió |
-| us-east-1 down | Pi valida códigos viejos | Checkout nuevo caído |
+| us-east-1 down | La caja valida códigos ya emitidos | Checkout nuevo caído |
+| Contador NVS de la caja adelante del de DynamoDB | No gastar códigos de lab en la caja de prod; ventana 50 | Alto si se prueban HOTP de contadores futuros |
 | Header de origen en el tfstate remoto | Bucket del state privado + versionado | Medio |
-| Desfase HOTP Pi vs DynamoDB | Primer counter = 0; webhook idempotente | Medio si hay doble incremento |
+| Desfase HOTP caja vs DynamoDB | Primer counter = 0; webhook idempotente; no probar códigos futuros en la caja | Medio si hay doble incremento |
 | Dos registros DMARC | Dejar uno solo | Bajo (entrega actual OK) |
 
 ## 5.7 Evolución prevista (no comprometida)
