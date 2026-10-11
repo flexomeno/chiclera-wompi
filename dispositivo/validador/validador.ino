@@ -3,8 +3,9 @@
  *
  * Teclado 4x4 + LCD 16x2 I2C + servo MG90S + LEDs + buzzer
  * LCD siempre: "Ingresa tu codigo" + dígitos al teclear.
- * Válido: 1 pitido, LED, servo +15°, 15 s, servo a 0°.
+ * Válido: 1 pitido, LED, servo +45°, 15 s, servo a 0°.
  * Inválido: 2 pitidos, LED rojo.
+ * Los códigos se pueden canjear fuera de orden (bitmap de usados).
  *
  * Sin WiFi. Secreto en secrets.h (mismo hex que HOTP_SECRET / pi/secret.key).
  *
@@ -55,11 +56,16 @@ static const char KEYS[4][4] = {
 };
 
 static const uint8_t DIGITS = 6;
-static const uint8_t RESYNC_WINDOW = 50;
 static const int SERVO_REPOSO = 0;
-static const int SERVO_ABIERTO = 15;
+static const int SERVO_ABIERTO = 45;
 static const uint32_t ABIERTO_MS = 15000;
 static const uint32_t RECHAZO_MS = 2000;
+
+// Códigos fuera de orden: bit i = counter (base + i) ya usado.
+// LOOKAHEAD: pagos nuevos por encima del último canjeado.
+static const uint16_t USED_BITS = 256;
+static const uint8_t USED_BYTES = 32;
+static const uint16_t LOOKAHEAD = 128;
 
 hd44780_I2Cexp lcd;
 bool lcdOk = false;
@@ -68,7 +74,9 @@ Preferences prefs;
 
 uint8_t secret[64];
 size_t secretLen = 0;
-int32_t lastCounter = -1;
+uint32_t usedBase = 0;
+int32_t highWater = -1;
+uint8_t usedBits[USED_BYTES];
 
 char typed[DIGITS + 1];
 uint8_t typedLen = 0;
@@ -176,12 +184,63 @@ static char scanKeypad() {
   return found;
 }
 
+static bool counterUsed(uint32_t counter) {
+  if (counter < usedBase) return true;
+  const uint32_t i = counter - usedBase;
+  if (i >= USED_BITS) return false;
+  return (usedBits[i / 8] >> (i % 8)) & 1;
+}
+
+static void persistUsed() {
+  prefs.putUChar("fmt", 2);
+  prefs.putUInt("base", usedBase);
+  prefs.putInt("high", highWater);
+  prefs.putBytes("bits", usedBits, USED_BYTES);
+}
+
+static void markUsed(uint32_t counter) {
+  if (counter < usedBase) return;
+  while (counter >= usedBase + USED_BITS) {
+    for (uint8_t b = 0; b < USED_BYTES - 1; b++) {
+      usedBits[b] = (uint8_t)((usedBits[b] >> 1) | ((usedBits[b + 1] & 1) << 7));
+    }
+    usedBits[USED_BYTES - 1] >>= 1;
+    usedBase++;
+  }
+  const uint32_t i = counter - usedBase;
+  usedBits[i / 8] |= (uint8_t)(1 << (i % 8));
+  if ((int32_t)counter > highWater) highWater = (int32_t)counter;
+  persistUsed();
+}
+
+static void loadUsed() {
+  memset(usedBits, 0, sizeof(usedBits));
+  usedBase = 0;
+  highWater = -1;
+  if (prefs.getUChar("fmt", 0) == 2) {
+    usedBase = prefs.getUInt("base", 0);
+    highWater = prefs.getInt("high", -1);
+    prefs.getBytes("bits", usedBits, USED_BYTES);
+    return;
+  }
+  const int32_t last = prefs.getInt("last", -1);
+  if (last >= 0) {
+    for (int32_t c = 0; c <= last; c++) markUsed((uint32_t)c);
+  }
+}
+
 static bool validateCode(const char *code, int32_t *matched) {
   char expected[8];
-  const int32_t start = lastCounter + 1;
-  for (uint8_t i = 0; i < RESYNC_WINDOW; i++) {
-    const int32_t counter = start + (int32_t)i;
+  const int32_t hi = highWater < 0 ? -1 : highWater;
+  int32_t end = hi + (int32_t)LOOKAHEAD;
+  const int32_t minEnd = (int32_t)usedBase + (int32_t)LOOKAHEAD - 1;
+  if (end < minEnd) end = minEnd;
+  const int32_t maxEnd = (int32_t)usedBase + (int32_t)USED_BITS + (int32_t)LOOKAHEAD - 1;
+  if (end > maxEnd) end = maxEnd;
+
+  for (int32_t counter = (int32_t)usedBase; counter <= end; counter++) {
     if (counter < 0) continue;
+    if (counterUsed((uint32_t)counter)) continue;
     generateHotp(secret, secretLen, (uint32_t)counter, DIGITS, expected);
     if (strcmp(expected, code) == 0) {
       *matched = counter;
@@ -192,8 +251,7 @@ static bool validateCode(const char *code, int32_t *matched) {
 }
 
 static void onValid(int32_t counter) {
-  lastCounter = counter;
-  prefs.putInt("last", lastCounter);
+  markUsed((uint32_t)counter);
 
   if (lcdOk) {
     lcd.clear();
@@ -213,7 +271,8 @@ static void onValid(int32_t counter) {
 }
 
 static void onInvalid() {
-  Serial.printf("Rechazado: '%s' last=%ld\n", typed, (long)lastCounter);
+  Serial.printf("Rechazado: '%s' high=%ld base=%lu\n", typed, (long)highWater,
+                (unsigned long)usedBase);
   if (lcdOk) {
     lcd.clear();
     lcdPrint(0, 0, "No valido");
@@ -317,8 +376,9 @@ void setup() {
   }
 
   prefs.begin("hotp", false);
-  lastCounter = prefs.getInt("last", -1);
-  Serial.printf("secretLen=%u last=%ld\n", (unsigned)secretLen, (long)lastCounter);
+  loadUsed();
+  Serial.printf("secretLen=%u base=%lu high=%ld\n", (unsigned)secretLen,
+                (unsigned long)usedBase, (long)highWater);
 
   typed[0] = '\0';
   typedLen = 0;

@@ -9,7 +9,7 @@ El punto de canje no tiene internet fiable. TOTP exigiría reloj sincronizado. U
 
 ## Decisión
 
-Se emite HOTP de 6 dígitos. El contador global vive en DynamoDB (atómico, primer valor = 0). La caja guarda su propio `last_counter` (NVS en el ESP32; `state.json` en la Pi de referencia) y el secreto (nunca en git). No hay llamada de la caja a AWS al validar. Ventana de resincronización: 50 contadores hacia adelante.
+Se emite HOTP de 6 dígitos. El contador global vive en DynamoDB (atómico, primer valor = 0). La caja **no** exige canje en orden: marca cada contador usado (bitmap en NVS; la Pi de referencia sigue con `last_counter` secuencial). El secreto no va a git. No hay llamada a AWS al validar. Ventana: 256 atrás / 128 adelante del último canje.
 
 ## Consecuencias
 

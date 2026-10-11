@@ -11,7 +11,7 @@ DynamoDB + Amazon SES. Sin VPC, sin NAT, sin WhatsApp.
 | Checkout | `https://d1jb3inqui1moe.cloudfront.net` |
 | Webhook Wompi | `https://w33aycsrjc.execute-api.us-east-1.amazonaws.com/webhooks/wompi` |
 | From SES | `Pagos <pagos@techtest.app>` |
-| Diseño | [`docs/diseno-infraestructura/`](docs/diseno-infraestructura/README.md) (v0.3, AWS + caja ESP32) |
+| Diseño | [`docs/diseno-infraestructura/`](docs/diseno-infraestructura/README.md) (v0.4, AWS + caja ESP32) |
 | Terraform | [`infra/`](infra/README.md) |
 
 El servidor Express local (`npm run server` + túnel) fue el prototipo con el que
@@ -100,8 +100,8 @@ caja ESP32 ([ADR 13](docs/diseno-infraestructura/04-adr/0013-validador-esp32.md)
 
 Ver [`dispositivo/README.md`](dispositivo/README.md). WiFi apagado. El secreto
 va en `secrets.h` (gitignored). El contador vive en la NVS del chip. Tras
-validar: 1 pitido, LED, servo +15°, LCD `Gira la perilla` / `a la derecha`,
-15 s, servo a 0°.
+validar: 1 pitido, LED, servo +45°, LCD `Gira la perilla` / `a la derecha`,
+15 s, servo a 0°. Los códigos se pueden canjear fuera de orden.
 
 La carpeta `pi/` es la misma lógica HOTP en Python, por si se usa una Pi.
 

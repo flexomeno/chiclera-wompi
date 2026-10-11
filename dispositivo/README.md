@@ -4,9 +4,13 @@ Caja offline: el cliente teclea el código de 6 dígitos. Si es un HOTP válido
 (el mismo algoritmo que `src/hotp.js` / `pi/hotp.py`):
 
 1. Un pitido en el buzzer y se enciende el LED amarillo (o verde).
-2. El servo MG90S gira **15°**.
+2. El servo MG90S gira **45°**.
 3. Espera **15 segundos**. El LCD muestra `Gira la perilla` / `a la derecha`.
 4. El servo vuelve a **0°**, el LED se apaga y el LCD vuelve a `______`.
+
+Los códigos **no tienen que canjearse en orden**. Cada contador usado se marca
+aparte (hasta 256 pendientes atrás y 128 adelante del último canje). Un código
+ya marcado no se reutiliza.
 
 Mientras se teclea, el LCD es siempre `Ingresa tu` / `codigo ______` (los
 dígitos aparecen al pulsar). Si el código es inválido o ya se usó: **dos
@@ -24,7 +28,7 @@ Cerebro: **ESP32 DevKit** (ESP-WROOM-32), no el NodeMCU.
 | ESP32 DevKit (micro-USB, 38 pines)    | Cerebro                                                    |
 | LCD 16x2 + backpack **I2C** (PCF8574) | Mensajes                                                   |
 | Teclado membrana 4x4                  | Entrada (`*` borra, `#` envía; a los 6 dígitos envía solo) |
-| TowerPro MG90S                        | Apertura 15°                                               |
+| TowerPro MG90S                        | Apertura 45°, 15 s, vuelve a 0°                            |
 | LED amarillo + resistor               | Válido (no trajiste verde)                                 |
 | LED rojo + resistor                   | Inválido                                                   |
 | Buzzer de 3 pines                     | 1 pitido = aprobado, 2 = rechazado                         |
@@ -143,19 +147,20 @@ al boot: si parpadea y no hay letras, **contraste**.
 
 1. Enciende. LCD: `Ingresa tu` / `codigo ______`
 2. Cada tecla se ve en la segunda línea. `#` envía; `*` borra. A los 6 dígitos envía solo.
-3. Válido → 1 pitido + LED + servo 15° + `Gira la perilla` / `a la derecha` → 15 s → cierra.
+3. Válido → 1 pitido + LED + servo 45° + `Gira la perilla` / `a la derecha` → 15 s → cierra.
 4. Inválido → 2 pitidos + `No valido` / `leido` y los dígitos que recibió.
-5. Un código ya aceptado no vuelve a abrir (contador en NVS).
+5. Un código ya aceptado no vuelve a abrir. Los demás, aunque sean más viejos,
+   siguen válidos.
 
 ## Si no abre con un código bueno
 
 - El hex de `secrets.h` debe ser **idéntico** al de SSM / `.env` (64 caracteres).
 - `leido` debe ser exactamente el código del correo. Si no, el teclado está cruzado.
-- El contador NVS de la caja **adelante** del de DynamoDB (probar HOTP de lab en
-  la caja de prod) rechaza el pago real: ese código ya “se gastó” en la ventana.
-- Más de 50 pagos sin canjear en esta caja → ventana agotada.
-- Resetear el contador (peligro: reusa códigos viejos de la ventana): *Erase all
-  flash* en Arduino o borrar el namespace NVS `hotp`.
+- Probar en la caja un código de un contador **muy futuro** (lab) lo marca
+  usado; ese pago real ya no abrirá.
+- Más de ~256 códigos viejos sin canjear, o 128 por delante del último
+  canje, salen de la ventana.
+- Resetear usados (peligro: reusa códigos): *Erase all flash* o borrar NVS `hotp`.
 
 
 

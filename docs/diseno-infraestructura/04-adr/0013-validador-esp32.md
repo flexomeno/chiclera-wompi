@@ -9,7 +9,7 @@ ADR 07 fijó HOTP offline. El prototipo validaba en consola Python sobre una Pi.
 
 ## Decisión
 
-La caja de producción es el firmware en [`dispositivo/`](../../../dispositivo/README.md): ESP32, WiFi apagado, secreto en `secrets.h` (gitignored, mismo hex que SSM), contador en NVS. `pi/` queda como referencia del algoritmo. LCD por I2C (SDA 21 / SCL 22), no en 4 bits. No conectar nada a CLK/D0–D3/CMD (bus de la flash).
+La caja de producción es el firmware en [`dispositivo/`](../../../dispositivo/README.md): ESP32, WiFi apagado, secreto en `secrets.h` (gitignored, mismo hex que SSM). El canje **no es secuencial**: NVS guarda un bitmap de contadores usados (256 atrás / 128 adelante). Servo **+45°** durante 15 s y vuelve a 0°. `pi/` queda como referencia del algoritmo (sigue con `last_counter` lineal). LCD por I2C (SDA 21 / SCL 22). No conectar nada a CLK/D0–D3/CMD (bus de la flash).
 
 ## Consecuencias
 

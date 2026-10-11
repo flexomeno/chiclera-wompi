@@ -4,8 +4,8 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 0.3 |
-| Fecha | 2026-10-10 |
+| Versión | 0.4 |
+| Fecha | 2026-10-11 |
 | Estado | **Desplegado en AWS (prod) + caja ESP32** |
 | Autor | Wilmar Rengifo |
 | Revisor | Por confirmar |

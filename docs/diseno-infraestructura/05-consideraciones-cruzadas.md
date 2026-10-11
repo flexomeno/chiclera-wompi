@@ -95,7 +95,7 @@ Lambda, DynamoDB, API Gateway, SES, S3, CloudFront. Un fallo de una AZ no deber�
 
 ### Continuidad en caja
 
-El ESP32 es el DR del **canje**: no depende de AWS al validar. Backup del hex HOTP y del `last_counter` (NVS) es responsabilidad operativa **fuera** de este stack (copia cifrada offline). No borrar la flash a menos que se acepte reusar códigos viejos de la ventana.
+El ESP32 es el DR del **canje**: no depende de AWS al validar. Backup del hex HOTP y del bitmap de usados (NVS) es responsabilidad operativa **fuera** de este stack. No borrar la flash a menos que se acepte reusar códigos.
 
 ## 5.5 Operación diaria
 
@@ -111,7 +111,7 @@ El ESP32 es el DR del **canje**: no depende de AWS al validar. Backup del hex HO
 |---|---|---|
 | Webhook Wompi aún en URL vieja (túnel) | Actualizar dashboard a execute-api | Alto si no se cambió |
 | us-east-1 down | La caja valida códigos ya emitidos | Checkout nuevo caído |
-| Contador NVS de la caja adelante del de DynamoDB | No gastar códigos de lab en la caja de prod; ventana 50 | Alto si se prueban HOTP de contadores futuros |
+| Probar HOTP de lab en la caja de prod | Marca ese contador usado; el pago real no abre | Medio |
 | Header de origen en el tfstate remoto | Bucket del state privado + versionado | Medio |
 | Desfase HOTP caja vs DynamoDB | Primer counter = 0; webhook idempotente; no probar códigos futuros en la caja | Medio si hay doble incremento |
 | Dos registros DMARC | Dejar uno solo | Bajo (entrega actual OK) |
